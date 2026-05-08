@@ -84,8 +84,8 @@ export default function CatGalleryScreen() {
       favouriteId={favourites[item.id]}
       score={scores[item.id] ?? 0}
       cardWidth={cardWidth}
-      favLoading={favouritePendingIds.has(item.id)} // ← only this card
-      voteLoading={votePendingIds.has(item.id)} // ← only this card
+      favLoading={favouritePendingIds.has(item.id)}
+      voteLoading={votePendingIds.has(item.id)}
       onFavouriteToggle={toggleFavourite}
       onVote={vote}
     />
