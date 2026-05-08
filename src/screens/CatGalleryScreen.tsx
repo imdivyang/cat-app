@@ -65,10 +65,10 @@ export default function CatGalleryScreen() {
     cats,
     favourites,
     hasError,
-    isFavouritePending,
+    favouritePendingIds, // ← was isFavouritePending
     isInitialLoading,
     isRefreshing,
-    isVotePending,
+    votePendingIds, // ← was isVotePending
     refreshAll,
     scores,
     toggleFavourite,
@@ -84,8 +84,8 @@ export default function CatGalleryScreen() {
       favouriteId={favourites[item.id]}
       score={scores[item.id] ?? 0}
       cardWidth={cardWidth}
-      favLoading={isFavouritePending}
-      voteLoading={isVotePending}
+      favLoading={favouritePendingIds.has(item.id)} // ← only this card
+      voteLoading={votePendingIds.has(item.id)} // ← only this card
       onFavouriteToggle={toggleFavourite}
       onVote={vote}
     />

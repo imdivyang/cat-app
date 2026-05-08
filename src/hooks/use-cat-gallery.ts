@@ -11,7 +11,7 @@ import {
 } from "@/api/cats";
 import { catQueryKeys } from "@/api/queryKeys";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 interface FavouriteMap {
   [imageId: string]: number;
@@ -23,6 +23,15 @@ interface ScoreMap {
 
 export const useCatGallery = () => {
   const queryClient = useQueryClient();
+
+  // ── Per-card loading sets ──────────────────────────────
+  const [favouritePendingIds, setFavouritePendingIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [votePendingIds, setVotePendingIds] = useState<Set<string>>(new Set());
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
+  // ── Queries ───────────────────────────────────────────
 
   const imagesQuery = useQuery({
     queryKey: catQueryKeys.images,
@@ -38,6 +47,8 @@ export const useCatGallery = () => {
   });
 
   const cats = imagesQuery.data ?? [];
+
+  // ── Derived Maps ──────────────────────────────────────
 
   const favourites = useMemo(() => {
     const favMap: FavouriteMap = {};
@@ -55,6 +66,8 @@ export const useCatGallery = () => {
     });
     return scoreMap;
   }, [votesQuery.data]);
+
+  // ── Mutations ─────────────────────────────────────────
 
   const favouriteMutation = useMutation({
     mutationFn: async ({
@@ -83,7 +96,6 @@ export const useCatGallery = () => {
           if (favouriteId) {
             return current.filter((fav) => fav.id !== favouriteId);
           }
-
           return [
             ...current,
             {
@@ -139,35 +151,64 @@ export const useCatGallery = () => {
     },
   });
 
+  // ── Refresh ───────────────────────────────────────────
+
   const refreshAll = async () => {
+    setIsManualRefreshing(true);
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: catQueryKeys.images }),
       queryClient.invalidateQueries({ queryKey: catQueryKeys.favourites }),
       queryClient.invalidateQueries({ queryKey: catQueryKeys.votes }),
     ]);
+    setIsManualRefreshing(false);
   };
+
+  // ── Actions with per-card loading ─────────────────────
+
+  const toggleFavourite = async (imageId: string, favouriteId?: number) => {
+    setFavouritePendingIds((prev) => new Set(prev).add(imageId));
+    try {
+      await favouriteMutation.mutateAsync({ imageId, favouriteId });
+    } finally {
+      setFavouritePendingIds((prev) => {
+        const updated = new Set(prev);
+        updated.delete(imageId);
+        return updated;
+      });
+    }
+  };
+
+  const vote = async (imageId: string, value: 1 | 0) => {
+    setVotePendingIds((prev) => new Set(prev).add(imageId));
+    try {
+      await voteMutation.mutateAsync({ imageId, value });
+    } finally {
+      setVotePendingIds((prev) => {
+        const updated = new Set(prev);
+        updated.delete(imageId);
+        return updated;
+      });
+    }
+  };
+
+  // ── Return ────────────────────────────────────────────
 
   return {
     cats,
     favourites,
-    refreshAll,
     scores,
     hasError:
       imagesQuery.isError || favouritesQuery.isError || votesQuery.isError,
-    isFavouritePending: favouriteMutation.isPending,
     isInitialLoading:
       (imagesQuery.isLoading && !imagesQuery.data) ||
       (favouritesQuery.isLoading && !favouritesQuery.data) ||
       (votesQuery.isLoading && !votesQuery.data),
-    isRefreshing:
-      imagesQuery.isRefetching ||
-      favouritesQuery.isRefetching ||
-      votesQuery.isRefetching,
-    isVotePending: voteMutation.isPending,
-    toggleFavourite: (imageId: string, favouriteId?: number) =>
-      favouriteMutation.mutate({ imageId, favouriteId }),
-    vote: (imageId: string, value: 1 | 0) =>
-      voteMutation.mutate({ imageId, value }),
+    isRefreshing: isManualRefreshing,
+    favouritePendingIds,
+    votePendingIds,
+    refreshAll,
+    toggleFavourite,
+    vote,
   };
 };
 
